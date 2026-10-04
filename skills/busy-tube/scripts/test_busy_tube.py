@@ -32,8 +32,12 @@ def test_parse_feed_and_select_new():
     assert videos[0]["published"] == "2026-10-03"
     assert videos[0]["url"].endswith("v=AAA")
     assert videos[1]["description"] == "desc B"
-    assert [v["id"] for v in bt.select_new(videos, {"AAA"}, 3)] == ["BBB"]
-    assert [v["id"] for v in bt.select_new(videos, set(), 1)] == ["AAA"]
+    for v, vid in zip(videos, ["dQw4w9WgXcQ", "xyzUVW67890"]):
+        v["id"] = vid
+    assert [v["id"] for v in bt.select_new(videos, {"dQw4w9WgXcQ"}, 3)] == ["xyzUVW67890"]
+    assert [v["id"] for v in bt.select_new(videos, set(), 1)] == ["dQw4w9WgXcQ"]
+    videos[0]["id"] = "../../evil1"  # 11 chars but not a valid ID: never used as a file name
+    assert [v["id"] for v in bt.select_new(videos, set(), 3)] == ["xyzUVW67890"]
 
 
 def test_group_segments():
