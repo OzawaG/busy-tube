@@ -1,0 +1,16 @@
+{
+  "name": "busy-tube",
+  "owner": {
+    "name": "OzawaG"
+  },
+  "metadata": {
+    "description": "busy-tube: YouTube channel digests for Claude Code"
+  },
+  "plugins": [
+    {
+      "name": "busy-tube",
+      "source": "./",
+      "description": "Summarize new videos from your YouTube channels into a Markdown digest."
+    }
+  ]
+}
