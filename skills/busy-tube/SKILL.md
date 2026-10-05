@@ -49,7 +49,7 @@ Turns new uploads from the user's YouTube channels into a Markdown digest they c
    2. Publish `html` with the Artifact tool, passing `files` as its supporting files.
       - The design is fixed by the template, so don't redesign it.
       - Use `icon: "video"` on the first publish. Set `description` to one sentence naming the channels and video count.
-      - On a later run the same day, publish the same `html` path again so the link stays the same.
+      - Keep one link per day. If an artifact for the same date already exists (its title is `busy-tube MM/DD号`, or `busy-tube MM/DD` in English), update it: republish the same `html` path in this session, or, from another session, find its URL with the Artifact tool's list action and publish with `url`.
    3. Give the user the link.
 
    The page escapes all text, keeps only YouTube links, and reduces diagrams to plain Mermaid flowcharts. You wrote the digest it comes from, so you have already seen its text.

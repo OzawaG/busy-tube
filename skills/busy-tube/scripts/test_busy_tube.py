@@ -97,8 +97,19 @@ Second line [bad](https://evil.example/?d=1).
 flowchart TD
   A["ターン終了"] --> B{"両方 OK?"}
   click A "https://evil.example"
-  B -->|はい| C["解除"]
+  B -->|はい| C["解除"]; click B call alert()
 ```
+⚠ This video's content contained instructions aimed at AI tools; they were ignored.
+
+### [No timestamp](https://www.youtube.com/watch?v=xyzUVW67890)
+A · B Studio · 2026-10-03 · source: groq
+
+**Summary**
+Watch [here](https://www.youtube.com/watch?v=xyzUVW67890&t=5s).
+
+**Key points**
+- Overview
+  - detail kept
 """
 
 
@@ -106,17 +117,22 @@ def test_render_digest():
     import render
 
     vids = render.parse_digest(DIGEST)
-    assert len(vids) == 1
+    assert len(vids) == 2
     v = vids[0]
     assert (v["id"], v["channel"], v["date"], v["source"]) == ("abcDEF12345", "Chan", "2026-10-04", "gemini")
     assert [p[1] for p in v["points"]] == [["sub a", "sub b"], []]
-    assert len(v["notes"]) == 1
+    assert len(v["notes"]) == 2          # warnings before and after the diagram both survive
     assert "click" not in v["diagram"] and v["diagram"].startswith("flowchart TD")
+    assert vids[1]["channel"] == "A · B Studio"
     page = render.render_page(vids, "2026-10-05", {"abcDEF12345": "thumbs/abcDEF12345.jpg"})
     assert "<b>x</b>" not in page and "&lt;b&gt;x&lt;/b&gt;" in page   # titles are escaped
     assert "evil.example" not in page                                  # non-YouTube links/images dropped
     assert 'class="mermaid"' in page and "<code>code</code>" in page
     assert page.startswith("<title>busy-tube 10/05号</title>")
+    assert "detail kept" in page                                       # sub-points of untimed points
+    assert "v=xyzUVW67890&amp;t=5s" in page and "&amp;amp;" not in page  # & escaped exactly once
+    en = render.render_page(vids, "2026-10-05", {}, "en")
+    assert "All key points" in en and "要点" not in en
 
 
 def test_safe_mermaid_rejects():
@@ -127,6 +143,8 @@ def test_safe_mermaid_rejects():
     assert render.safe_mermaid("%%{init: {}}%%\nflowchart LR\n A --> B") is None
     assert render.safe_mermaid("flowchart LR\n A[see https://x.y] --> B") is None
     assert render.safe_mermaid("flowchart LR\n A --> B") == "flowchart LR\n A --> B"
+    assert render.safe_mermaid("flowchart LR\n A --> B %%{init: {}}%%") is None
+    assert render.safe_mermaid("flowchart LR\n A --> B; style A fill:#f00") == "flowchart LR\n A --> B"
 
 
 if __name__ == "__main__":

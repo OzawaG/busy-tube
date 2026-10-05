@@ -9,12 +9,32 @@ import re
 from pathlib import Path
 
 TEMPLATE = Path(__file__).resolve().parent.parent / "assets" / "digest-template.html"
-SOURCE_LABEL = {
-    "gemini": "Gemini で映像ごと解析",
-    "groq": "Groq で音声を文字起こし",
-    "mlx-whisper": "ローカルで文字起こし",
-    "whisper": "ローカルで文字起こし",
-    "captions": "字幕から",
+# Page chrome per summary language; any language other than Japanese gets English.
+UI = {
+    "ja": {
+        "source": {"gemini": "Gemini で映像ごと解析", "groq": "Groq で音声を文字起こし", "mlx-whisper": "ローカルで文字起こし",
+                   "whisper": "ローカルで文字起こし", "captions": "字幕から"},
+        "title": "busy-tube {m:02d}/{d:02d}号", "date": "{y}年{m}月{d}日",
+        "h1_one": "{channel}<br>新着{n}本のまとめ", "h1_many": "YouTube 新着{n}本のまとめ",
+        "lede_diagram": "各動画は「要約 → 図 → 要点」の順に読めます。", "lede_plain": "各動画は「要約 → 要点」の順に読めます。",
+        "lede_tail": "要点は折りたたんであり、時刻を押すとその場面から再生できます。",
+        "stats": "この号の概要", "videos": "本", "points": "要点", "channels": "チャンネル", "toc": "この号の動画",
+        "open": "YouTube で「{title}」を開く", "play_from": "{ts} から再生", "figure": "図：この動画の仕組み・流れ",
+        "all_points": "要点をすべて見る", "count": "{n}件・時刻から再生できます",
+        "foot": "要約は busy-tube が動画の中身から作成しました。サムネイルの著作権は各チャンネルに帰属します。",
+    },
+    "en": {
+        "source": {"gemini": "Gemini watched the video", "groq": "Transcribed with Groq", "mlx-whisper": "Transcribed locally",
+                   "whisper": "Transcribed locally", "captions": "From captions"},
+        "title": "busy-tube {m:02d}/{d:02d}", "date": "{y}-{m:02d}-{d:02d}",
+        "h1_one": "{channel}<br>{n} new videos", "h1_many": "{n} new YouTube videos",
+        "lede_diagram": "Each video reads summary → diagram → key points. ", "lede_plain": "Each video reads summary → key points. ",
+        "lede_tail": "Key points are folded; tap a timestamp to play from that moment.",
+        "stats": "This issue at a glance", "videos": "videos", "points": "key points", "channels": "channels",
+        "toc": "Videos in this issue", "open": "Open “{title}” on YouTube", "play_from": "Play from {ts}",
+        "figure": "Diagram: how it works in this video", "all_points": "All key points",
+        "count": "{n} points · tap a time to play", "foot": "Summaries written by busy-tube from each video's content. Thumbnails belong to their channels.",
+    },
 }
 YOUTUBE = ("https://youtu.be/", "https://www.youtube.com/")
 VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}")
@@ -32,7 +52,8 @@ def inline(text):
         label, url = m.group(1), m.group(2)
         if not url.startswith(YOUTUBE):
             return label
-        return f'<a href="{html.escape(url)}" target="_blank" rel="noopener">{label}</a>'
+        # text was escaped above with quote=False, so only `"` is left to escape in the attribute
+        return f'<a href="{url.replace(chr(34), "&quot;")}" target="_blank" rel="noopener">{label}</a>'
 
     return re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", link, t)
 
@@ -42,9 +63,15 @@ def safe_mermaid(src):
     lines = [l.rstrip() for l in src.strip().splitlines() if l.strip()]
     if not lines or not MERMAID_HEAD.fullmatch(lines[0].strip()) or len(lines) > 40:
         return None
-    body = [l for l in lines[1:] if not l.strip().lower().startswith(MERMAID_DROP)]
+    if any("%%" in l for l in lines):
+        return None  # directives/comments can sit mid-line
+    body = []
+    for l in lines[1:]:  # ';' chains statements, so filter each one, not just the line start
+        kept = [st for st in l.split(";") if st.strip() and not st.strip().lower().startswith(MERMAID_DROP)]
+        if kept:
+            body.append(";".join(kept))
     if not body or any(re.search(r"<\s*[A-Za-z/!]|&#|`", l) for l in body) or any("://" in l for l in body):
-        return None  # html labels or URLs (init blocks are dropped above): not worth the risk
+        return None  # html labels or URLs: not worth the risk
     return "\n".join([lines[0].strip()] + body)
 
 
@@ -52,11 +79,13 @@ def parse_digest(md):
     videos = []
     for block in md.split("\n### ")[1:]:
         lines = block.split("\n")
+        if len(lines) < 2:
+            continue
         m = re.match(r"\[(.+)\]\((https://www\.youtube\.com/watch\?v=([A-Za-z0-9_-]{11}))\)", lines[0])
         if not m:
             continue
         title, url, vid = m.groups()
-        meta = [x.strip() for x in lines[1].split("·")]
+        meta = [x.strip() for x in lines[1].rsplit("·", 2)]  # channel names may contain '·' 
         body = "\n".join(lines[2:])
         summary_part = body.split("**Summary**", 1)[-1].split("**Key points**", 1)[0]
         points_part = body.split("**Key points**", 1)[1] if "**Key points**" in body else ""
@@ -64,7 +93,7 @@ def parse_digest(md):
         dm = re.search(r"```mermaid\n(.*?)```", points_part, re.S)
         if dm:
             diagram = safe_mermaid(dm.group(1))
-            points_part = points_part[:dm.start()]
+            points_part = points_part[:dm.start()] + points_part[dm.end():]
         points, notes = [], []
         for l in points_part.split("\n"):
             if l.startswith("- "):
@@ -84,65 +113,65 @@ def parse_digest(md):
     return videos
 
 
-def render_video(i, v, thumb):
+def render_video(i, v, thumb, t):
     pts = []
     for text, subs in v["points"]:
+        sub = ("<ul>" + "".join(f"<li>{inline(s)}</li>" for s in subs) + "</ul>") if subs else ""
         m = TS_POINT.match(text)
         if not m:
-            pts.append(f'<li><span></span><div class="pt">{inline(text)}</div></li>')
+            pts.append(f'<li><span></span><div class="pt">{inline(text)}{sub}</div></li>')
             continue
         ts, turl, body = m.groups()
-        sub = ("<ul>" + "".join(f"<li>{inline(s)}</li>" for s in subs) + "</ul>") if subs else ""
         pts.append(f'<li><a class="ts" href="{turl}" target="_blank" rel="noopener" '
-                   f'aria-label="{ts} から再生">{ts}</a><div class="pt">{inline(body)}{sub}</div></li>')
+                   f'aria-label="{t["play_from"].format(ts=ts)}">{ts}</a><div class="pt">{inline(body)}{sub}</div></li>')
     lead, rest = (v["summary"] or [""])[0], v["summary"][1:]
     img = (f'<img src="{thumb}" alt="" width="320" height="180">' if thumb else "")
     diagram = (f'<figure class="diagram"><pre class="mermaid">{html.escape(v["diagram"])}</pre>'
-               f'<figcaption>図：この動画の仕組み・流れ</figcaption></figure>') if v["diagram"] else ""
+               f'<figcaption>{t["figure"]}</figcaption></figure>') if v["diagram"] else ""
     notes = "".join(f'<p class="note">{html.escape(n)}</p>' for n in v["notes"])
     title = html.escape(v["title"])
     date = html.escape(v["date"])
+    source = html.escape(t["source"].get(v["source"], v["source"]))
     return f"""
 <article class="video" id="v{i + 1}">
   <div class="v-top">
-    <a class="thumb" href="{v['url']}" target="_blank" rel="noopener" aria-label="YouTube で「{title}」を開く">{img}
+    <a class="thumb" href="{v['url']}" target="_blank" rel="noopener" aria-label="{t['open'].format(title=title)}">{img}
       <span class="play-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span></a>
     <div class="v-head">
-      <p class="v-meta"><span>{html.escape(v['channel'])}</span><time datetime="{date}">{date[5:].replace('-', '/')}</time><span class="src">{html.escape(SOURCE_LABEL.get(v['source'], v['source']))}</span></p>
+      <p class="v-meta"><span>{html.escape(v['channel'])}</span><time datetime="{date}">{date[5:].replace('-', '/')}</time><span class="src">{source}</span></p>
       <h2><a href="{v['url']}" target="_blank" rel="noopener">{title}</a></h2>
     </div>
   </div>
   <div class="summary"><p class="lead">{inline(lead)}</p>{''.join(f'<p>{inline(s)}</p>' for s in rest)}</div>
   {notes}{diagram}
   <details>
-    <summary><span class="chev" aria-hidden="true"></span>要点をすべて見る<span class="count">{len(v['points'])}件・時刻から再生できます</span></summary>
+    <summary><span class="chev" aria-hidden="true"></span>{t['all_points']}<span class="count">{t['count'].format(n=len(v['points']))}</span></summary>
     <ol class="timeline">{''.join(pts)}</ol>
   </details>
 </article>"""
 
 
-def render_page(videos, day, thumbs):
-    """videos from parse_digest; day 'YYYY-MM-DD'; thumbs {video_id: relative path}."""
+def render_page(videos, day, thumbs, lang="ja"):
+    """videos from parse_digest; day 'YYYY-MM-DD'; thumbs {video_id: relative path}; lang = summary language."""
+    t = UI["ja" if lang == "ja" else "en"]
     channels = list(dict.fromkeys(v["channel"] for v in videos if v["channel"]))
-    heading = (f"{html.escape(channels[0])}<br>新着{len(videos)}本のまとめ" if len(channels) == 1
-               else f"YouTube 新着{len(videos)}本のまとめ")
-    y, m, d = day.split("-")
+    heading = (t["h1_one"].format(channel=html.escape(channels[0]), n=len(videos)) if len(channels) == 1
+               else t["h1_many"].format(n=len(videos)))
+    y, m, d = (int(x) for x in day.split("-"))
     toc = "".join(
         f'<li><a href="#v{i + 1}"><span class="n">{i + 1}</span><span class="t">{html.escape(v["title"])}'
         f'<span class="c">{html.escape(v["channel"])}</span></span></a></li>' for i, v in enumerate(videos))
-    has_diagram = any(v["diagram"] for v in videos)
-    lede = ("各動画は「要約 → 図 → 要点」の順に読めます。" if has_diagram else "各動画は「要約 → 要点」の順に読めます。") + \
-        "要点は折りたたんであり、時刻を押すとその場面から再生できます。"
+    lede = (t["lede_diagram"] if any(v["diagram"] for v in videos) else t["lede_plain"]) + t["lede_tail"]
     body = f"""<div class="wrap">
 <header class="masthead">
-  <p class="kicker"><span class="logo" aria-hidden="true"></span>busy-tube ・ {int(y)}年{int(m)}月{int(d)}日</p>
+  <p class="kicker"><span class="logo" aria-hidden="true"></span>busy-tube ・ {t['date'].format(y=y, m=m, d=d)}</p>
   <h1>{heading}</h1>
   <p class="lede">{lede}</p>
-  <ul class="stats" aria-label="この号の概要"><li><b>{len(videos)}</b>本</li><li><b>{sum(len(v['points']) for v in videos)}</b>要点</li><li><b>{len(channels)}</b>チャンネル</li></ul>
+  <ul class="stats" aria-label="{t['stats']}"><li><b>{len(videos)}</b>{t['videos']}</li><li><b>{sum(len(v['points']) for v in videos)}</b>{t['points']}</li><li><b>{len(channels)}</b>{t['channels']}</li></ul>
 </header>
-<nav class="toc" aria-label="この号の動画"><ol>{toc}</ol></nav>
-{''.join(render_video(i, v, thumbs.get(v['id'])) for i, v in enumerate(videos))}
-<footer class="foot"><p>要約は busy-tube が動画の中身から作成しました。サムネイルの著作権は各チャンネルに帰属します。</p></footer>
+<nav class="toc" aria-label="{t['toc']}"><ol>{toc}</ol></nav>
+{''.join(render_video(i, v, thumbs.get(v['id']), t) for i, v in enumerate(videos))}
+<footer class="foot"><p>{t['foot']}</p></footer>
 </div>"""
-    title = f"busy-tube {m}/{d}号"
-    return TEMPLATE.read_text().replace("{{TITLE}}", title).replace("{{BODY}}", body)
+    page = TEMPLATE.read_text(encoding="utf-8").replace("{{TITLE}}", t["title"].format(m=m, d=d))
+    return page.replace("{{BODY}}", body)

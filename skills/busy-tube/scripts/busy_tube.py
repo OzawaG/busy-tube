@@ -57,12 +57,12 @@ NS = {
 
 def load(name, default):
     p = HOME / name
-    return json.loads(p.read_text()) if p.exists() else default
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else default
 
 
 def save(name, data):
     HOME.mkdir(parents=True, exist_ok=True)
-    (HOME / name).write_text(json.dumps(data, ensure_ascii=False, indent=2))
+    (HOME / name).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def load_config():
@@ -401,7 +401,8 @@ def cmd_fetch(args):
                 f"id: {v['id']}\npublished: {v['published']}\nurl: {v['url']}\nsource: {name}\n\n"
                 f"{UNTRUSTED_BEGIN}\nchannel: {fence(v['channel'])}\n# {fence(v['title'])}\n\n"
                 f"## Description\n\n{fence(v['description'])}\n\n## Content\n\n{fence(text)}\n"
-                f"{UNTRUSTED_END}\n"
+                f"{UNTRUSTED_END}\n",
+                encoding="utf-8",
             )
             # titles stay out of this JSON: the main agent can run commands, so it only sees IDs
             result["videos"].append({"id": v["id"], "channel_id": ch["id"], "published": v["published"],
@@ -453,7 +454,7 @@ def cmd_html(args):
     day = re.search(r"\d{4}-\d{2}-\d{2}", md_path.name)
     if not day:
         raise SystemExit("digest file name must contain the date, e.g. 2026-10-05.md")
-    videos = render.parse_digest(md_path.read_text())
+    videos = render.parse_digest(md_path.read_text(encoding="utf-8"))
     if not videos:
         raise SystemExit(f"no videos found in {md_path}")
     out = Path(args.out).expanduser()
@@ -461,17 +462,21 @@ def cmd_html(args):
     thumbs, files = {}, {}
     for v in videos:  # IDs are validated by parse_digest's regex before they reach a path or URL
         rel = f"thumbs/{v['id']}.jpg"
+        if (out / rel).exists():  # already fetched by an earlier run today
+            thumbs[v["id"]] = rel
+            files[rel] = str(out / rel)
+            continue
         try:
             req = urllib.request.Request(f"https://i.ytimg.com/vi/{v['id']}/mqdefault.jpg", headers=UA)
             with urllib.request.urlopen(req, timeout=30) as r:
                 (out / rel).write_bytes(r.read())
-        except (urllib.error.URLError, OSError) as e:
+        except OSError as e:  # URLError is an OSError
             print(f"thumbnail skipped for {v['id']}: {e}", file=sys.stderr)
             continue
         thumbs[v["id"]] = rel
         files[rel] = str(out / rel)
     page = out / f"busy-tube-{day.group()}.html"
-    page.write_text(render.render_page(videos, day.group(), thumbs))
+    page.write_text(render.render_page(videos, day.group(), thumbs, load_config()["lang"]), encoding="utf-8")
     print(json.dumps({"html": str(page), "files": files}, indent=2))
 
 
