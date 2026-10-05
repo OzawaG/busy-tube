@@ -28,6 +28,8 @@ Claude に普通の言葉で頼んでください。
 
 要約はチャットに表示され、`~/.busy-tube/digests/YYYY-MM-DD.md` にも保存されます。
 
+Claude Code で Artifact ツールが使える場合（claude.ai と連携しているとき）は、要約を自分だけが見られる Web ページとしても公開します。ページには、サムネイル、動画の要点となる仕組みの図、その場面から再生できる時刻リンクが入ります。
+
 ## engine（中身の取得方法）
 
 設定した順に試します。準備できていない engine は飛ばし、無料枠の上限などで失敗したら次の engine に移ります。既定の順番は `gemini → groq → mlx-whisper → whisper → captions` です。

@@ -76,6 +76,59 @@ def test_run_engines_falls_through():
     assert name is None and len(errors) == 2
 
 
+DIGEST = """# YouTube digest — 2026-10-05
+
+### [Title <b>x</b>](https://www.youtube.com/watch?v=abcDEF12345)
+Chan · 2026-10-04 · source: gemini
+
+**Summary**
+Lead line with `code`.
+Second line [bad](https://evil.example/?d=1).
+
+**Key points**
+- [0:43](https://youtu.be/abcDEF12345?t=43) Point one
+  - sub a
+  1. sub b
+- [1:22](https://youtu.be/abcDEF12345?t=82) ![img](https://evil.example/x.png) Point two
+⚠ This video's content contained instructions aimed at AI tools; they were ignored.
+
+**Diagram**
+```mermaid
+flowchart TD
+  A["ターン終了"] --> B{"両方 OK?"}
+  click A "https://evil.example"
+  B -->|はい| C["解除"]
+```
+"""
+
+
+def test_render_digest():
+    import render
+
+    vids = render.parse_digest(DIGEST)
+    assert len(vids) == 1
+    v = vids[0]
+    assert (v["id"], v["channel"], v["date"], v["source"]) == ("abcDEF12345", "Chan", "2026-10-04", "gemini")
+    assert [p[1] for p in v["points"]] == [["sub a", "sub b"], []]
+    assert len(v["notes"]) == 1
+    assert "click" not in v["diagram"] and v["diagram"].startswith("flowchart TD")
+    page = render.render_page(vids, "2026-10-05", {"abcDEF12345": "thumbs/abcDEF12345.jpg"})
+    assert "<b>x</b>" not in page and "&lt;b&gt;x&lt;/b&gt;" in page   # titles are escaped
+    assert "evil.example" not in page                                  # non-YouTube links/images dropped
+    assert 'class="mermaid"' in page and "<code>code</code>" in page
+    assert page.startswith("<title>busy-tube 10/05号</title>")
+
+
+def test_safe_mermaid_rejects():
+    import render
+
+    assert render.safe_mermaid("sequenceDiagram\n A->>B: hi") is None
+    assert render.safe_mermaid('flowchart LR\n A["<img src=x>"] --> B') is None
+    assert render.safe_mermaid("%%{init: {}}%%\nflowchart LR\n A --> B") is None
+    assert render.safe_mermaid("flowchart LR\n A[see https://x.y] --> B") is None
+    assert render.safe_mermaid("flowchart LR\n A --> B") == "flowchart LR\n A --> B"
+
+
 if __name__ == "__main__":
     for fn in [v for k, v in dict(globals()).items() if k.startswith("test_")]:
         fn()

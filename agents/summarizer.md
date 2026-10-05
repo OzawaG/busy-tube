@@ -37,4 +37,24 @@ Key points have no fixed count. Add a point whenever:
 
 Each point needs the timestamp link where it starts, and concrete details: names, numbers, steps, conclusions.
 
+### Optional diagram
+
+When the video explains a process, loop, mechanism, decision or before/after that a picture makes clearer, end the section with a diagram. Otherwise, leave it out.
+
+````markdown
+**Diagram**
+```mermaid
+flowchart TD
+  A["Turn ends"] --> B{"Both judges OK?"}
+  B -->|"yes"| C["Goal cleared"]
+  B -->|"no"| A
+```
+````
+
+Rules for the diagram:
+- Start with `flowchart TD`. Top-down layouts fit phone screens.
+- Use at most 10 nodes, with short labels in double quotes, written in the summary's language.
+- Use only nodes and arrows. No `click`, `style`, `classDef`, links, HTML or `%%` lines; anything else is removed or the diagram is dropped.
+- Draw what the video actually explains. Never invent steps.
+
 Use the full content, not just the title and description. Return nothing except the section.

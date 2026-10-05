@@ -5,7 +5,7 @@
 """busy-tube: collect new videos from YouTube channels and fetch their full content.
 
 Claude writes the summaries; this script only gathers data.
-Usage: uv run busy_tube.py {add,remove,list,fetch,mark-seen,config,doctor,flags} ...
+Usage: uv run busy_tube.py {add,remove,list,fetch,mark-seen,config,doctor,flags,html} ...
 """
 import argparse
 import html
@@ -446,6 +446,35 @@ def run_flags(cfg):
     return flags
 
 
+def cmd_html(args):
+    import render
+
+    md_path = Path(args.digest).expanduser()
+    day = re.search(r"\d{4}-\d{2}-\d{2}", md_path.name)
+    if not day:
+        raise SystemExit("digest file name must contain the date, e.g. 2026-10-05.md")
+    videos = render.parse_digest(md_path.read_text())
+    if not videos:
+        raise SystemExit(f"no videos found in {md_path}")
+    out = Path(args.out).expanduser()
+    (out / "thumbs").mkdir(parents=True, exist_ok=True)
+    thumbs, files = {}, {}
+    for v in videos:  # IDs are validated by parse_digest's regex before they reach a path or URL
+        rel = f"thumbs/{v['id']}.jpg"
+        try:
+            req = urllib.request.Request(f"https://i.ytimg.com/vi/{v['id']}/mqdefault.jpg", headers=UA)
+            with urllib.request.urlopen(req, timeout=30) as r:
+                (out / rel).write_bytes(r.read())
+        except (urllib.error.URLError, OSError) as e:
+            print(f"thumbnail skipped for {v['id']}: {e}", file=sys.stderr)
+            continue
+        thumbs[v["id"]] = rel
+        files[rel] = str(out / rel)
+    page = out / f"busy-tube-{day.group()}.html"
+    page.write_text(render.render_page(videos, day.group(), thumbs))
+    print(json.dumps({"html": str(page), "files": files}, indent=2))
+
+
 def cmd_flags(args):
     print(" ".join(run_flags(load_config())))
 
@@ -491,6 +520,10 @@ def main():
     c.set_defaults(func=cmd_config)
     sub.add_parser("doctor").set_defaults(func=cmd_doctor)
     sub.add_parser("flags").set_defaults(func=cmd_flags)
+    h = sub.add_parser("html", help="render a digest .md into an artifact-ready HTML page")
+    h.add_argument("digest")
+    h.add_argument("--out", required=True, help="directory to write the page and thumbnails into")
+    h.set_defaults(func=cmd_html)
     args = p.parse_args()
     args.func(args)
 

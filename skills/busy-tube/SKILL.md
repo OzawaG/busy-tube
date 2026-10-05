@@ -40,6 +40,19 @@ Turns new uploads from the user's YouTube channels into a Markdown digest they c
 3. Assemble the digest in the format below. Show it in chat, and write it to `digest_path`. If that file already exists, append to it.
 4. Mark only the summarized videos as seen: `S mark-seen <id> <id> ...`. Videos listed in `failed` stay unseen and are retried next run.
 5. If `failed` is non-empty, list each `url` with a one-line reason from `errors`. If every engine was skipped, run `S doctor` and point to the setup below.
+6. **Artifact page (only if you have an `Artifact` tool; otherwise skip this step silently).**
+   1. Render the digest into a page. Use your scratchpad directory for `<dir>`, or the working directory if you have no scratchpad, because the Artifact tool only publishes files from those places:
+      ```bash
+      S html <digest_path> --out <dir>
+      ```
+      It prints JSON: `html` (the page) and `files` (thumbnail images, as published path → local path).
+   2. Publish `html` with the Artifact tool, passing `files` as its supporting files.
+      - The design is fixed by the template, so don't redesign it.
+      - Use `icon: "video"` on the first publish. Set `description` to one sentence naming the channels and video count.
+      - On a later run the same day, publish the same `html` path again so the link stays the same.
+   3. Give the user the link.
+
+   The page escapes all text, keeps only YouTube links, and reduces diagrams to plain Mermaid flowcharts. You wrote the digest it comes from, so you have already seen its text.
 
 ## Digest format
 

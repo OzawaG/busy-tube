@@ -1,0 +1,127 @@
+<title>{{TITLE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@500;800&family=BIZ+UDPGothic:wght@400;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one reading column. Each video = thumbnail + title → summary (lead line first) → optional diagram → collapsible timestamp log.
+   Color: hue fixed on blue, varied by tone; green/amber only carry meaning; accent kept to links and markers. */
+:root {
+  --bg: #f4f6fa; --surface: #ffffff; --surface-2: #f0f3f9; --fg: #172033; --muted: #4f5b70; --line: #d9dfe9;
+  --accent: #2347c8; --accent-soft: #e8edfb; --warn: #8a4b0f; --warn-bg: #fbefe0;
+  --focus: #d9480f;
+  --display: "M PLUS 1p", "Hiragino Sans", system-ui, sans-serif;
+  --body: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --ease-out: cubic-bezier(.2, .7, .2, 1);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f141d; --surface: #171e2a; --surface-2: #1d2534; --fg: #e6eaf2; --muted: #a3adbf; --line: #2a3445;
+  --accent: #8fa8ff; --accent-soft: #1f2a47; --warn: #f2b36b; --warn-bg: #362816;
+  --focus: #ff8a4c; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f141d; --surface: #171e2a; --surface-2: #1d2534; --fg: #e6eaf2; --muted: #a3adbf; --line: #2a3445;
+  --accent: #8fa8ff; --accent-soft: #1f2a47; --warn: #f2b36b; --warn-bg: #362816;
+  --focus: #ff8a4c; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 16px/1.9 var(--body); padding: 0 16px; }
+.wrap { max-width: 780px; margin: 0 auto; padding-block: 40px 80px; display: grid; gap: 32px; }
+a { color: var(--accent); text-underline-offset: 3px; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: 6px; }
+code { font: 0.84em var(--mono); background: var(--accent-soft); padding: 0.1em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+
+.masthead { display: grid; gap: 12px; }
+.kicker { margin: 0; display: flex; align-items: center; gap: 10px; font: 500 13px/1 var(--mono); letter-spacing: .06em; color: var(--muted); }
+.logo { width: 22px; height: 16px; border-radius: 5px; background: var(--accent); position: relative; flex: none; }
+.logo::after { content: ""; position: absolute; left: 8px; top: 4px; border-left: 7px solid var(--surface); border-block: 4px solid transparent; }
+.masthead h1 { margin: 0; font: 800 clamp(28px, 6.4vw, 42px)/1.3 var(--display); text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 40em; }
+.stats { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.stats li { background: var(--surface); border: 1px solid var(--line); border-radius: 99px; padding: 4px 14px; font-size: 14px; color: var(--muted); }
+.stats b { font: 800 18px/1 var(--display); color: var(--fg); margin-right: 2px; font-variant-numeric: tabular-nums; }
+
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.toc a { display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: start; padding: 10px 12px; border-radius: 10px; color: var(--fg); text-decoration: none; transition: background-color 150ms var(--ease-out); }
+.toc a:hover { background: var(--surface); }
+.toc .n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font: 800 14px/1 var(--display); margin-top: 2px; }
+.toc .t { min-width: 0; font-weight: 700; line-height: 1.7; }
+.toc .c { display: block; font: 500 12px/1.6 var(--body); color: var(--muted); }
+
+.video { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: clamp(18px, 4vw, 32px); display: grid; gap: 24px; min-width: 0; scroll-margin-top: 16px; }
+.v-top { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 20px; align-items: center; }
+.thumb { position: relative; display: block; border-radius: 12px; overflow: hidden; aspect-ratio: 16 / 9; max-width: 100%; background: var(--surface-2); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 300ms var(--ease-out); }
+.thumb:hover img { transform: scale(1.04); }
+.play-icon { position: absolute; inset: auto 10px 10px auto; width: 38px; height: 38px; border-radius: 50%; background: rgb(0 0 0 / .72); display: grid; place-items: center; }
+.play-icon svg { width: 20px; height: 20px; fill: #fff; margin-left: 2px; }
+.v-meta { margin: 0 0 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
+.v-meta time { font: 500 13px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.src { padding: 3px 10px; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--line); }
+.video h2 { margin: 0; font: 800 clamp(18px, 3.4vw, 22px)/1.5 var(--display); text-wrap: balance; }
+.video h2 a { color: var(--fg); text-decoration: none; }
+.video h2 a:hover { color: var(--accent); text-decoration: underline; }
+
+.summary { display: grid; gap: 8px; max-width: 40em; }
+.summary p { margin: 0; }
+.summary .lead { font-weight: 700; font-size: 17px; line-height: 1.8; padding-left: 14px; border-left: 4px solid var(--accent); }
+.note { margin: 0; padding: 10px 14px; border-radius: 10px; background: var(--warn-bg); color: var(--warn); font-size: 14px; }
+
+.diagram { margin: 0; background: var(--surface-2); border-radius: 14px; padding: 16px; display: grid; gap: 10px; min-width: 0; }
+.diagram pre.mermaid { margin: 0; background: transparent; overflow-x: auto; text-align: center; font: 14px var(--body); }
+.diagram pre.mermaid svg { max-width: 100%; height: auto; }
+.diagram figcaption { font-size: 14px; color: var(--muted); }
+
+details { border-top: 1px solid var(--line); padding-top: 4px; }
+summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 4px; font: 800 15px/1.4 var(--display); min-height: 44px; }
+summary::-webkit-details-marker { display: none; }
+.chev { width: 10px; height: 10px; border-right: 2.5px solid var(--accent); border-bottom: 2.5px solid var(--accent); transform: rotate(-45deg); transition: transform 200ms var(--ease-out); }
+details[open] .chev { transform: rotate(45deg); }
+.count { font: 500 12px/1 var(--body); color: var(--muted); }
+.timeline { list-style: none; margin: 4px 0 0; padding: 0; display: grid; }
+.timeline > li { display: grid; grid-template-columns: 4.8em minmax(0, 1fr); gap: 12px; padding: 12px 0; border-top: 1px dashed var(--line); }
+.timeline > li:first-child { border-top: 0; }
+.ts { font: 500 13px/1.9 var(--mono); font-variant-numeric: tabular-nums; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 0 8px; justify-self: start; text-decoration: none; }
+.ts:hover { text-decoration: underline; }
+.pt { max-width: 40em; }
+.pt ul { margin: 6px 0 0; padding-left: 1.2em; display: grid; gap: 2px; }
+
+.foot { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); padding-top: 16px; }
+.foot p { margin: 0; }
+
+@media (max-width: 560px) {
+  .v-top { grid-template-columns: minmax(0, 1fr); }
+  .timeline > li { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+
+/* motion: 3 kinds only — card entrance, diagram build-up, disclosure.
+   Everything is visible by default; the script adds .is-wait/.is-in only when motion is allowed. */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  .video.is-wait { opacity: .01; transform: translateY(18px); }
+  .video.is-in { opacity: 1; transform: none; transition: opacity 520ms var(--ease-out), transform 520ms var(--ease-out); }
+  .diagram.is-in svg .seq { animation: pop 420ms var(--ease-out) both; animation-delay: calc(var(--s, 0) * 110ms + 150ms); }
+  details[open] .timeline { animation: open 240ms var(--ease-out); }
+}
+@keyframes pop { from { opacity: .01; } to { opacity: 1; } }
+@keyframes open { from { opacity: .01; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .chev, .thumb img, .toc a { transition-duration: 1ms; } }
+</style>
+{{BODY}}
+<script>
+// Play each animation when its element scrolls into view (the viewer may load the frame hidden,
+// so load-time animation can finish unseen).
+(() => {
+  if (!('IntersectionObserver' in window) || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      // Mermaid renders asynchronously; number its shapes in drawing order once it's there.
+      e.target.querySelectorAll('svg .node, svg .edgePath, svg .flowchart-link, svg .edgeLabel, svg .cluster')
+        .forEach((el, i) => { el.classList.add('seq'); el.style.setProperty('--s', i); });
+      e.target.classList.add('is-in');
+      io.unobserve(e.target);
+    }
+  }, { rootMargin: '0px 0px -15% 0px' });
+  document.querySelectorAll('.video').forEach(el => { el.classList.add('is-wait'); io.observe(el); });
+  document.querySelectorAll('.diagram').forEach(el => io.observe(el));
+})();
+</script>

@@ -28,6 +28,8 @@ Ask Claude in plain language:
 
 The digest appears in chat and is also saved to `~/.busy-tube/digests/YYYY-MM-DD.md`.
 
+If your Claude Code has the Artifact tool (it does when connected to claude.ai), the digest is also published as a private web page. The page has thumbnails, a diagram of each video's key mechanism, and timestamp links that start the video at that point.
+
 ## Engines
 
 The plugin tries the engines in order and skips any that aren't set up. If one fails, for example because a free quota ran out, it moves on to the next. The default order is `gemini → groq → mlx-whisper → whisper → captions`.
