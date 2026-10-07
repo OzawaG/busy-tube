@@ -76,6 +76,21 @@ def test_run_engines_falls_through():
     assert name is None and len(errors) == 2
 
 
+def test_garbled_transcripts_fall_through():
+    en = {"title": "Claude for Google Workspace", "description": "Use Claude inside Docs, Sheets and Slides."}
+    khmer = "[0:00] " + "ក្រុមហ៊ុន បានប្រកាស ថ្ងៃនេះ " * 40
+    assert "KHMER" in bt.garbled(en, khmer)
+    assert bt.garbled(en, "[0:00] Today we are launching Claude inside Google Docs and Sheets.") is None
+    ja = {"title": "【解説】Claude Codeの新機能", "description": "今回はModsを紹介します"}
+    assert bt.garbled(ja, "[0:00] 今日はクロードコードの新しい機能を紹介します") is None
+    assert "repeated" in bt.garbled(ja, "[0:00] " + "はい。 " * 300)
+
+    engines = {"groq": (lambda: None, lambda v, c: khmer), "captions": (lambda: None, lambda v, c: "[0:00] hello there")}
+    check = lambda n, v, t: bt.garbled(v, t) if n in bt.TRANSCRIBERS else None
+    name, text, errors = bt.run_engines(en, {}, engines, ["groq", "captions"], check)
+    assert name == "captions" and "rejected" in errors[0]
+
+
 DIGEST = """# YouTube digest — 2026-10-05
 
 ### [Title <b>x</b>](https://www.youtube.com/watch?v=abcDEF12345)

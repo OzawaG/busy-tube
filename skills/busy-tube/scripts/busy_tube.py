@@ -21,6 +21,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+import unicodedata
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import date
@@ -143,8 +144,51 @@ def group_segments(segments, every=30):
     return "\n".join(lines)
 
 
-def run_engines(video, cfg, engines, order):
-    """Try engines in order. engines: {name: (check, run)}; check() -> reason or None."""
+TRANSCRIBERS = {"groq", "mlx-whisper", "whisper", "captions"}  # gemini writes notes in cfg["lang"] instead
+
+
+def script_of(ch):
+    """Writing system of one character: LATIN, CJK, HANGUL, KHMER, ... (None for non-letters)."""
+    if not ch.isalpha():
+        return None
+    name = unicodedata.name(ch, "")
+    if name.startswith(("CJK", "HIRAGANA", "KATAKANA")):
+        return "CJK"
+    return name.split(" ")[0] or None
+
+
+def script_share(text):
+    counts = {}
+    for ch in text:
+        sc = script_of(ch)
+        if sc:
+            counts[sc] = counts.get(sc, 0) + 1
+    total = sum(counts.values()) or 1
+    return {k: n / total for k, n in counts.items()}
+
+
+def garbled(video, text):
+    """Reason string if a transcript looks like a Whisper hallucination, else None.
+
+    ponytail: two heuristics, not a language model. Add a third only when a real miss shows up.
+    """
+    body = re.sub(r"\[\d+:\d{2}(?::\d{2})?\]", " ", text)
+    share = script_share(body)
+    if share:
+        main = max(share, key=share.get)
+        meta = script_share(video.get("title", "") + " " + video.get("description", ""))
+        # speech is in the video's language, so its script must show up in the title/description
+        if meta and meta.get(main, 0) < 0.1:
+            return f"transcript is mostly {main} script, unlike the title/description"
+    words = body.split()
+    if len(words) >= 200 and len(set(words)) / len(words) < 0.1:
+        return "transcript is mostly the same few words repeated"
+    return None
+
+
+def run_engines(video, cfg, engines, order, validate=lambda name, video, text: None):
+    """Try engines in order. engines: {name: (check, run)}; check() -> reason or None.
+    validate(name, video, text) -> reason or None rejects a result and moves on."""
     errors = []
     for name in order:
         check, run = engines[name]
@@ -157,9 +201,14 @@ def run_engines(video, cfg, engines, order):
         except Exception as e:  # any engine failure falls through to the next one
             errors.append(f"{name}: {type(e).__name__}: {str(e)[:200]}")
             continue
-        if text and text.strip():
-            return name, text, errors
-        errors.append(f"{name}: empty result")
+        if not (text and text.strip()):
+            errors.append(f"{name}: empty result")
+            continue
+        bad = validate(name, video, text)
+        if bad:
+            errors.append(f"{name}: rejected ({bad})")
+            continue
+        return name, text, errors
     return None, None, errors
 
 
@@ -390,7 +439,8 @@ def cmd_fetch(args):
         for v in new:
             v["channel"] = ch["title"]  # the UULF feed's own title is just "Videos"
             print(f"fetching: {v['channel']} / {v['title']}", file=sys.stderr)
-            name, text, errors = run_engines(v, cfg, ENGINES, order)
+            name, text, errors = run_engines(v, cfg, ENGINES, order,
+                                                lambda n, vid, t: garbled(vid, t) if n in TRANSCRIBERS else None)
             if "_audio" in v:
                 shutil.rmtree(Path(v.pop("_audio")).parent, ignore_errors=True)
             if not name:
