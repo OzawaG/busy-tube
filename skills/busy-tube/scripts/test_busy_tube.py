@@ -91,6 +91,19 @@ def test_garbled_transcripts_fall_through():
     assert name == "captions" and "rejected" in errors[0]
 
 
+def test_channel_since_skips_backlog():
+    feed = [{"id": f"vid{i:08d}", "published": f"2026-10-{20 - i:02d}"} for i in range(10)]  # newest first
+    # new channel: baseline is the oldest of the first run's picks, so later runs don't pull the backlog
+    since = bt.channel_since(feed, set(), 3)
+    assert since == "2026-10-18"
+    assert [v["id"] for v in bt.select_new(feed, {"vid00000000", "vid00000001", "vid00000002"}, 3, since)] == []
+    # existing channel: baseline is the oldest already-summarized video in the feed
+    seen = {"vid00000003", "vid00000005"}
+    since = bt.channel_since(feed, seen, 3)
+    assert since == "2026-10-15"
+    assert [v["published"] for v in bt.select_new(feed, seen, 9, since)] == ["2026-10-20", "2026-10-19", "2026-10-18", "2026-10-16"]
+
+
 DIGEST = """# YouTube digest — 2026-10-05
 
 ### [Title <b>x</b>](https://www.youtube.com/watch?v=abcDEF12345)

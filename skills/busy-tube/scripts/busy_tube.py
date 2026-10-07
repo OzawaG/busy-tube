@@ -114,8 +114,21 @@ def parse_engines(value):
     return engines
 
 
-def select_new(videos, seen, limit):
-    return [v for v in videos if VIDEO_ID.fullmatch(v["id"]) and v["id"] not in seen][:limit]
+def select_new(videos, seen, limit, since=None):
+    """Unseen videos, newest first. `since` (YYYY-MM-DD) drops the backlog published before it."""
+    return [v for v in videos if VIDEO_ID.fullmatch(v["id"]) and v["id"] not in seen
+            and (not since or v["published"] >= since)][:limit]
+
+
+def channel_since(videos, seen, limit):
+    """Baseline date for a channel that has none yet.
+
+    The feed lists ~15 uploads; without a baseline every run would pull 3 more old ones.
+    Already-summarized videos mark where the user started; otherwise the first run's picks do.
+    """
+    dates = [v["published"] for v in videos if v["id"] in seen] or \
+            [v["published"] for v in select_new(videos, seen, limit)]
+    return min(dates) if dates else None
 
 
 def fmt_ts(sec):
@@ -426,13 +439,18 @@ def cmd_fetch(args):
     limit = args.max if args.max is not None else cfg["max"]
     seen = set(load("seen.json", []))
     out_dir = HOME / "transcripts"
+    shutil.rmtree(out_dir, ignore_errors=True)  # leftovers of earlier runs; this run rewrites what it needs
     out_dir.mkdir(parents=True, exist_ok=True)
     (HOME / "digests").mkdir(exist_ok=True)
-    result ={"lang": cfg["lang"], "digest_path": str(HOME / "digests" / f"{date.today()}.md"),
+    result = {"lang": cfg["lang"], "digest_path": str(HOME / "digests" / f"{date.today()}.md"),
               "videos": [], "failed": []}
-    for ch in load("channels.json", []):
+    channels = load("channels.json", [])
+    for ch in channels:
         try:
-            new = select_new(channel_videos(ch["id"]), seen, limit)
+            feed = channel_videos(ch["id"])
+            if not ch.get("since"):
+                ch["since"] = channel_since(feed, seen, limit)
+            new = select_new(feed, seen, limit, ch["since"])
         except Exception as e:
             result["failed"].append({"channel_id": ch["id"], "errors": [f"feed: {e}"]})
             continue
@@ -457,6 +475,7 @@ def cmd_fetch(args):
             # titles stay out of this JSON: the main agent can run commands, so it only sees IDs
             result["videos"].append({"id": v["id"], "channel_id": ch["id"], "published": v["published"],
                                      "url": v["url"], "source": name, "path": str(path)})
+    save("channels.json", channels)  # keeps each channel's baseline date
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
