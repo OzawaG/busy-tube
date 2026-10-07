@@ -1,52 +1,69 @@
-# busy-tube
+<h1 align="center">busy-tube</h1>
+<p align="center">
+  <strong>見る時間がない YouTube を、中身まで読める要約に。</strong>
+</p>
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/OzawaG/busy-tube?style=flat" alt="License"></a>
+</p>
 
-[日本語](README.ja.md)
+<p align="center">
+  <strong title="日本語" aria-label="日本語">🇯🇵</strong> ·
+  <a href=".github/readme/README.en.md" title="English" aria-label="English">🇬🇧</a> ·
+  <a href=".github/readme/README.zh-CN.md" title="简体中文" aria-label="简体中文">🇨🇳</a> ·
+  <a href=".github/readme/README.ko.md" title="한국어" aria-label="한국어">🇰🇷</a> ·
+  <a href=".github/readme/README.es.md" title="Español" aria-label="Español">🇪🇸</a> ·
+  <a href=".github/readme/README.pt-BR.md" title="Português (Brasil)" aria-label="Português (Brasil)">🇧🇷</a> ·
+  <a href=".github/readme/README.fr.md" title="Français" aria-label="Français">🇫🇷</a> ·
+  <a href=".github/readme/README.de.md" title="Deutsch" aria-label="Deutsch">🇩🇪</a> ·
+  <a href=".github/readme/README.vi.md" title="Tiếng Việt" aria-label="Tiếng Việt">🇻🇳</a>
+</p>
 
-busy-tube is a Claude Code plugin that summarizes new videos from your YouTube channels into a Markdown digest. It's meant for when you want what's in the videos but don't have time to watch them.
+登録した YouTube チャンネルの新着動画を、Markdown の要約にまとめる Claude Code プラグインです。情報収集はしたいけれど、動画を見る時間がない人向けです。
 
-- **Full content, not just titles.** Gemini watches the video (audio and on-screen content), or Whisper transcribes it, or the captions are used. Videos without captions are covered too.
-- **Free.** It needs no paid API. The cloud engines run on free tiers, and the local engines need no key at all.
-- **Only what's new.** The plugin remembers which videos it has already summarized.
-- **Your language.** Japanese is the default; you can change it with `config --lang`.
+- **動画の中身まで把握して要約します。** Gemini が音声と画面の内容を解析するか、Whisper で文字起こしするか、字幕を使います。字幕のない動画にも対応しています。
+- **無料で使えます。** 有料の API は使いません。クラウドの engine は無料枠で動き、ローカルの engine はキーも要りません。
+- **新着だけを要約します。** 一度要約した動画は記録して、次回からは飛ばします。
+- **読みやすいページも作ります。** サムネイル、仕組みの図、その場面から再生できる時刻リンクが入ったページを公開します（Artifact ツールが使える場合）。
+- **要約の言語は選べます。** 既定は日本語で、`config --lang` で変更できます。
 
-## Install
+## インストール
 
-You need [uv](https://docs.astral.sh/uv/) and Claude Code.
+[uv](https://docs.astral.sh/uv/) と Claude Code が必要です。
 
 ```
 /plugin marketplace add OzawaG/busy-tube
 /plugin install busy-tube@busy-tube
 ```
 
-## Use
+## 使い方
 
-Ask Claude in plain language:
+Claude に普通の言葉で頼んでください。スラッシュコマンド `/busy-tube:busy-tube` でも呼べます。
 
-- "Add https://www.youtube.com/@GoogleDevelopers to busy-tube"
-- "Summarize my new YouTube videos"
-- "Switch busy-tube to English" / "Use only whisper and captions"
+- 「https://www.youtube.com/@GoogleDevelopers を busy-tube に追加して」
+- 「YouTube の新着を要約して」
+- 「要約は英語にして」「whisper と字幕だけ使って」
 
-The digest appears in chat and is also saved to `~/.busy-tube/digests/YYYY-MM-DD.md`.
+要約はチャットに表示され、`~/.busy-tube/digests/YYYY-MM-DD.md` にも保存されます。
 
-If your Claude Code has the Artifact tool (it does when connected to claude.ai), the digest is also published as a private web page. The page has thumbnails, a diagram of each video's key mechanism, and timestamp links that start the video at that point.
+Claude Code で Artifact ツールが使える場合（claude.ai と連携しているとき）は、要約を自分だけが見られる Web ページとしても公開します。ページには、サムネイル、動画の要点となる仕組みの図、その場面から再生できる時刻リンクが入ります。
 
-## Engines
+## engine（中身の取得方法）
 
-The plugin tries the engines in order and skips any that aren't set up. If one fails, for example because a free quota ran out, it moves on to the next. The default order is `gemini → groq → mlx-whisper → whisper → captions`.
+設定した順に試します。準備できていない engine は飛ばし、無料枠の上限などで失敗したら次の engine に移ります。既定の順番は `gemini → groq → mlx-whisper → whisper → captions` です。
 
-| engine | setup | good at | limits |
+| engine | 準備 | 得意なこと | 制約 |
 |---|---|---|---|
-| `gemini` | `export GEMINI_API_KEY=...` ([get a free key](https://aistudio.google.com/apikey)) | sees slides, code and on-screen text | about 20 requests/day on the free tier, 8 h of video/day, public videos only, free-tier inputs may be used by Google |
-| `groq` | `export GROQ_API_KEY=...` ([get a free key](https://console.groq.com/keys)) + ffmpeg | very fast Whisper large-v3 | about 8 h of audio/day |
-| `mlx-whisper` | Apple Silicon Mac + ffmpeg | fast, local, no key | Mac only |
-| `whisper` | nothing (faster-whisper) | local, no key, any OS | slower, and needs a ~3 GB model download on first use |
-| `captions` | nothing | instant | only works if the video has captions |
+| `gemini` | `export GEMINI_API_KEY=...`（[無料キー](https://aistudio.google.com/apikey)） | スライド・コード・画面の文字も拾える | 無料枠は 1 日 20 リクエスト程度、動画は合計 8 時間/日まで、公開動画のみ、入力は Google の製品改善に使われる |
+| `groq` | `export GROQ_API_KEY=...`（[無料キー](https://console.groq.com/keys)）と ffmpeg | Whisper large-v3 で非常に速い | 1 日 8 時間分まで |
+| `mlx-whisper` | Apple Silicon の Mac と ffmpeg | ローカルで速い。キー不要 | Mac 専用 |
+| `whisper` | 準備不要（faster-whisper） | ローカル。キー不要。どの OS でも動く | 遅め。初回にモデルを約 3GB ダウンロードする |
+| `captions` | 準備不要 | 一瞬で終わる | 字幕がある動画だけ |
 
-Run `uv run skills/busy-tube/scripts/busy_tube.py doctor` to see which engines are ready.
+どの engine が使えるかは `uv run skills/busy-tube/scripts/busy_tube.py doctor` で確認できます。
 
-If a video fails on every engine, it isn't marked as seen, so it's retried on the next run.
+BGM だけの動画などで、文字起こしが意味のない文字列になることがあります。その場合は自動で見分けて、次の engine に回します。すべての engine で失敗した動画は既読にしないので、次回また試します。
 
-## Settings
+## 設定
 
 ```bash
 S=skills/busy-tube/scripts/busy_tube.py
@@ -54,15 +71,25 @@ uv run $S config --lang en --max 5 --engines groq,whisper,captions
 uv run $S config --gemini-model gemini-3.8-flash --whisper-model large-v3
 ```
 
-`--max` sets how many new videos to take per channel on each run. Your data lives in `~/.busy-tube/`; set `BUSY_TUBE_HOME` to put it somewhere else.
+`--max` は、1 回の実行でチャンネルごとに取得する新着の上限です。データは `~/.busy-tube/` に保存されます。場所を変えたいときは `BUSY_TUBE_HOME` を設定してください。
 
-## Development
+## セキュリティ
+
+動画のタイトル・説明文・字幕は他人が書いたものなので、AI への悪い指示が混ざっていることがあります。busy-tube は次の3つでこれを防ぎます。
+
+- 動画の中身を読むのは、ファイルを読むことしかできない専用の要約エージェントだけです。
+- 中身は「信頼できない内容」の印で囲んで渡します。
+- 公開するページでは、文字をすべて無害化し、YouTube 以外のリンクを取り除きます。
+
+API キーは環境変数からだけ読み、ファイルには保存しません。
+
+## 開発
 
 ```bash
-python3 skills/busy-tube/scripts/test_busy_tube.py   # unit tests, no deps
-claude --plugin-dir .                                # try the plugin locally
+python3 skills/busy-tube/scripts/test_busy_tube.py   # 単体テスト（依存なし）
+claude --plugin-dir .                                # ローカルで試す
 ```
 
-## License
+## ライセンス
 
 MIT
