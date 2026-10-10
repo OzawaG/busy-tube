@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -307,18 +308,40 @@ Write detailed notes in {lang} that let someone fully understand the video witho
 Output only the notes."""
 
 
+def with_deadline(fn, seconds):
+    """Run fn() but give up after `seconds` in total. urlopen's timeout is per socket read,
+    so a slowly trickling or stuck response can otherwise block for hours."""
+    box = {}
+
+    def target():
+        try:
+            box["value"] = fn()
+        except BaseException as e:
+            box["error"] = e
+
+    # daemon: an abandoned call must not keep the process alive at exit
+    t = threading.Thread(target=target, daemon=True)
+    t.start()
+    t.join(seconds)
+    if t.is_alive():
+        raise TimeoutError(f"no result within {seconds}s")
+    if "error" in box:
+        raise box["error"]
+    return box["value"]
+
+
 def run_gemini(video, cfg):
     model = cfg["gemini_model"]
     body = {"contents": [{"parts": [
         {"file_data": {"file_uri": video["url"]}},
         {"text": GEMINI_PROMPT.format(lang=cfg["lang"])},
     ]}]}
-    res = json.loads(http(
+    res = json.loads(with_deadline(lambda: http(
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
         data=json.dumps(body).encode(),
         headers={"x-goog-api-key": os.environ["GEMINI_API_KEY"], "Content-Type": "application/json"},
         timeout=900,
-    ))
+    ), 900))
     parts = res["candidates"][0]["content"]["parts"]
     return "\n".join(p.get("text", "") for p in parts)
 

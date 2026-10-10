@@ -76,6 +76,25 @@ def test_run_engines_falls_through():
     assert name is None and len(errors) == 2
 
 
+def test_with_deadline():
+    import time
+
+    assert bt.with_deadline(lambda: 42, 1) == 42
+    try:
+        bt.with_deadline(lambda: 1 / 0, 1)
+        assert False
+    except ZeroDivisionError:
+        pass
+    # a stuck call gives up on time and falls through to the next engine
+    engines = {
+        "gemini": (lambda: None, lambda v, c: bt.with_deadline(lambda: time.sleep(10), 0.2)),
+        "captions": (lambda: None, lambda v, c: "[0:00] hello"),
+    }
+    start = time.time()
+    name, _, errors = bt.run_engines({}, {}, engines, ["gemini", "captions"])
+    assert name == "captions" and "TimeoutError" in errors[0] and time.time() - start < 2
+
+
 def test_garbled_transcripts_fall_through():
     en = {"title": "Claude for Google Workspace", "description": "Use Claude inside Docs, Sheets and Slides."}
     khmer = "[0:00] " + "ក្រុមហ៊ុន បានប្រកាស ថ្ងៃនេះ " * 40

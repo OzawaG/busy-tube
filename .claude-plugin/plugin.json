@@ -1,6 +1,6 @@
 {
   "name": "busy-tube",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Summarize new videos from your YouTube channels into a Markdown digest — full content via Gemini, Whisper or captions, all free.",
   "author": { "name": "OzawaG" },
   "homepage": "https://github.com/OzawaG/busy-tube",
